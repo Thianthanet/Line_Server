@@ -6,6 +6,7 @@ const fs = require('fs')
 const axios = require('axios')
 const multer = require('multer')
 const { PrismaClient } = require('@prisma/client')
+const favicon = require('serve-favicon')
 
 const cloudinary = require('cloudinary').v2
 
@@ -19,6 +20,7 @@ const prisma = new PrismaClient()
 app.use(cors())
 app.use(express.json())
 app.use('/uploads', express.static('uploads'))
+app.use(favicon(path.join(__dirname, '../public/favicon.ico')))
 
 const upload = multer({ dest: 'uploads/' })
 
@@ -77,7 +79,7 @@ app.post('/api/report', upload.fields([{ name: 'image1' }, { name: 'image2' }]),
 
   const user = await prisma.user.findUnique({ where: { userId } })
 
-  const message = `📋 แจ้งซ่อม \n${user.firstname || '-'} ${user.lastname || '-'}\nประเภท: ${type}\nรายละเอียด: ${detail}`
+  const message = `📋 แจ้งซ่อมใหม่จาก \n${user.firstname || '-'} ${user.lastname || '-'}\nประเภท: ${type}\nรายละเอียด: ${detail}`
 
   const headers = {
     Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
