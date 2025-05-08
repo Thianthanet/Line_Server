@@ -7,6 +7,13 @@ const axios = require('axios')
 const multer = require('multer')
 const { PrismaClient } = require('@prisma/client')
 
+const cloudinary = require('cloudinary').v2
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+})
 
 const prisma = new PrismaClient()
 app.use(cors())
@@ -49,31 +56,39 @@ app.get('/api/getUser/:id', async (req, res) => {
 // ส่งข้อมูลแจ้งซ่อม
 app.post('/api/report', upload.fields([{ name: 'image1' }, { name: 'image2' }]), async (req, res) => {
   const { userId, type, detail } = req.body
-  const image1 = req.files['image1'][0].path
-  const image2 = req.files['image2'][0].path
+
+  const uploadToCloudinary = async (filePath) => {
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: 'line-reports'
+    })
+    fs.unlinkSync(filePath) // ลบไฟล์หลังอัปโหลด
+    return result.secure_url
+  }
+
+  const image1Path = req.files['image1'][0].path
+  const image2Path = req.files['image2'][0].path
+
+  const image1Url = await uploadToCloudinary(image1Path)
+  const image2Url = await uploadToCloudinary(image2Path)
 
   const report = await prisma.report.create({
-    data: { userId, type, detail, image1, image2 }
+    data: { userId, type, detail, image1: image1Url, image2: image2Url }
   })
 
   const user = await prisma.user.findUnique({ where: { userId } })
 
-  const message = `📋 แจ้งซ่อมใหม่จาก ${user.firstname} ${user.lastname}\nประเภท: ${type}\nรายละเอียด: ${detail}`
-  const image1Url = `${req.protocol}://${req.get('host')}/${image1}`
-  const image2Url = `${req.protocol}://${req.get('host')}/${image2}`
+  const message = `📋 แจ้งซ่อม \n${user.firstname || '-'} ${user.lastname || '-'}\nประเภท: ${type}\nรายละเอียด: ${detail}`
 
   const headers = {
     Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
     'Content-Type': 'application/json'
   }
 
-  // ส่งหาผู้แจ้ง
   await axios.post('https://api.line.me/v2/bot/message/push', {
     to: userId,
     messages: [{ type: 'text', text: '📌 ระบบได้รับรายการแจ้งซ่อมของคุณแล้ว' }]
   }, { headers })
 
-  // ส่งไปยังกลุ่ม
   await axios.post('https://api.line.me/v2/bot/message/push', {
     to: process.env.LINE_GROUP_ID,
     messages: [
@@ -85,5 +100,6 @@ app.post('/api/report', upload.fields([{ name: 'image1' }, { name: 'image2' }]),
 
   res.json(report)
 })
+
 
 app.listen(3001, () => console.log('Server started on http://localhost:3001'))
