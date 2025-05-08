@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -15,7 +16,10 @@ model User {
   lastname  String
   location  String
   phone     String
+  role      String   @default("user")
   reports   Report[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Report {
@@ -24,7 +28,8 @@ model Report {
   detail    String
   image1    String
   image2    String
-  createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [userId])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
