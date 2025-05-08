@@ -20,7 +20,7 @@ const prisma = new PrismaClient()
 app.use(cors())
 app.use(express.json())
 app.use('/uploads', express.static('uploads'))
-app.use(favicon(path.join(__dirname, '../public/favicon.ico')))
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 
 const upload = multer({ dest: 'uploads/' })
 
