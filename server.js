@@ -31,6 +31,15 @@ if (!fs.existsSync(tempUploadDir)) {
 
 const upload = multer({ dest: tempUploadDir })
 
+app.get('/', (req, res) => {
+  try {
+    res.json({ message: "API Created by Thianthanet" })
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
 // ตรวจสอบว่า user มีอยู่ในระบบหรือยัง
 app.post('/api/check-user', async (req, res) => {
   const { userId } = req.body
