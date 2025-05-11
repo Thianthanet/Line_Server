@@ -92,6 +92,7 @@ app.post('/api/report', upload.fields([{ name: 'image1' }, { name: 'image2' }]),
     })
 
     const user = await prisma.user.findUnique({ where: { userId } })
+    const job = await prisma.report.findUnique({ where: { userId } })
 
     const message = `📋 แจ้งซ่อมใหม่จาก \n${user.firstname || '-'} ${user.lastname || '-'}\nประเภท: ${type}\nรายละเอียด: ${detail}`
 
