@@ -8,6 +8,7 @@ const multer = require("multer");
 const { PrismaClient } = require("@prisma/client");
 const favicon = require("serve-favicon");
 const cloudinary = require("cloudinary").v2;
+const bodyParser = require('body-parser');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -39,6 +40,53 @@ app.get("/", (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+app.post('/webhook', async (req, res) => {
+  const events = req.body.events;
+  
+  for (const event of events) {
+    if (event.type === 'message' && event.message.type === 'text') {
+      const userMessage = event.message.text;  // เบอร์โทรศัพท์ที่ผู้ใช้ส่งมา
+      const userId = event.source.userId; // userId จาก LINE OA
+
+      try {
+        // ค้นหาเบอร์โทรในฐานข้อมูล
+        const user = await prisma.user.findUnique({
+          where: { phone: userMessage }
+        });
+
+        if (user) {
+          // หากพบผู้ใช้ในฐานข้อมูล ส่งข้อความตอบกลับ
+          await sendLineMessage(userId, 'ลงทะเบียนสำเร็จ');
+        } else {
+          // หากไม่พบผู้ใช้ในฐานข้อมูล
+          await sendLineMessage(userId, 'ไม่พบข้อมูลผู้ใช้');
+        }
+
+      } catch (error) {
+        console.error(error);
+        await sendLineMessage(userId, 'เกิดข้อผิดพลาด');
+      }
+    }
+  }
+
+  res.status(200).send('OK');
+});
+
+// ฟังก์ชั่นสำหรับส่งข้อความกลับไปยัง LINE OA
+async function sendLineMessage(userId, message) {
+  const data = {
+    replyToken: userId,
+    messages: [{ type: 'text', text: message }]
+  };
+
+  await axios.post('https://api.line.me/v2/bot/message/reply', data, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+    }
+  });
+}
 
 // ตรวจสอบว่า user มีอยู่ในระบบหรือยัง
 app.post("/api/check-user", async (req, res) => {
