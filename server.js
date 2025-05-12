@@ -9,12 +9,20 @@ const { PrismaClient } = require("@prisma/client");
 const favicon = require("serve-favicon");
 const cloudinary = require("cloudinary").v2;
 const bodyParser = require('body-parser');
+const line = require('@line/bot-sdk');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+const lineConfig = {
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
+}
+
+const lineClient = new line.Client(lineConfig)
 
 const prisma = new PrismaClient();
 
@@ -41,52 +49,60 @@ app.get("/", (req, res) => {
   }
 });
 
-app.post('/webhook', async (req, res) => {
-  const events = req.body.events;
-  
-  for (const event of events) {
-    if (event.type === 'message' && event.message.type === 'text') {
-      const userMessage = event.message.text;  // เบอร์โทรศัพท์ที่ผู้ใช้ส่งมา
-      const userId = event.source.userId; // userId จาก LINE OA
+app.post('/webhook', line.middleware(lineConfig), async (req, res) => {
+  try {
+    const events = req.body.events;
+    
+    for (const event of events) {
+      if (event.type === 'message' && event.message.type === 'text') {
+        const userMessage = event.message.text.trim();
+        const userId = event.source.userId;
 
-      try {
-        // ค้นหาเบอร์โทรในฐานข้อมูล
-        const user = await prisma.user.findUnique({
-          where: { phone: userMessage }
-        });
+        if (/^[0-9]{10}$/.test(userMessage)) {
+          try {
+            const user = await prisma.user.findFirst({
+              where: { phone: userMessage }
+            });
 
-        if (user) {
-          // หากพบผู้ใช้ในฐานข้อมูล ส่งข้อความตอบกลับ
-          await sendLineMessage(userId, 'ลงทะเบียนสำเร็จ');
+            if (user) {
+              await lineClient.replyMessage(event.replyToken, {
+                type: 'text',
+                text: '✅ ลงทะเบียนสำเร็จ! ขอบคุณที่ใช้บริการของเรา'
+              });
+              
+              if (!user.userId) {
+                await prisma.user.update({
+                  where: { id: user.id },
+                  data: { userId }
+                });
+              }
+            } else {
+              await lineClient.replyMessage(event.replyToken, {
+                type: 'text',
+                text: `❌ ไม่พบหมายเลขโทรศัพท์นี้ในระบบ\nกรุณาติดต่อเจ้าหน้าที่ที่หมายเลข 02-XXX-XXXX`
+              });
+            }
+          } catch (error) {
+            console.error('Database error:', error);
+            await lineClient.replyMessage(event.replyToken, {
+              type: 'text',
+              text: '⚠️ เกิดข้อผิดพลาดในการตรวจสอบข้อมูล กรุณาลองใหม่อีกครั้ง'
+            });
+          }
         } else {
-          // หากไม่พบผู้ใช้ในฐานข้อมูล
-          await sendLineMessage(userId, 'ไม่พบข้อมูลผู้ใช้');
+          await lineClient.replyMessage(event.replyToken, {
+            type: 'text',
+            text: '📱 กรุณากรอกหมายเลขโทรศัพท์ 10 หลักเพื่อลงทะเบียน\nตัวอย่าง: 0812345678'
+          });
         }
-
-      } catch (error) {
-        console.error(error);
-        await sendLineMessage(userId, 'เกิดข้อผิดพลาด');
       }
     }
+    res.status(200).end();
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.status(500).end();
   }
-
-  res.status(200).send('OK');
 });
-
-// ฟังก์ชั่นสำหรับส่งข้อความกลับไปยัง LINE OA
-async function sendLineMessage(userId, message) {
-  const data = {
-    replyToken: userId,
-    messages: [{ type: 'text', text: message }]
-  };
-
-  await axios.post('https://api.line.me/v2/bot/message/reply', data, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
-    }
-  });
-}
 
 // ตรวจสอบว่า user มีอยู่ในระบบหรือยัง
 app.post("/api/check-user", async (req, res) => {
