@@ -176,7 +176,7 @@ app.post(
 
       // Send LINE notifications
       const user = await prisma.user.findUnique({ where: { userId } });
-      const message = `📋 แจ้งซ่อมใหม่จาก \n${reportId} \n${
+      const message = `📋 แจ้งซ่อมใหม่จาก ID: \n${reportId} \n${
         user.firstname || "-"
       } ${user.lastname || "-"}\nประเภท: ${type}\nรายละเอียด: ${detail}`;
 
