@@ -10,13 +10,13 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
-  userId    String   @unique
-  token     String   @db.Text
-  firstname String
-  lastname  String
-  location  String
-  phone     String
-  role      String   @default("user")
+  userId    String?   @unique
+  token     String?   @db.Text
+  firstname String?
+  lastname  String?
+  location  String?
+  phone     String?
+  role      String?   @default("user")
   reports   Report[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

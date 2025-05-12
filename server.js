@@ -56,6 +56,19 @@ app.post('/api/register', async (req, res) => {
   res.json(user)
 })
 
+app.post('/api/createUser' , async (req, res) => {
+  try {
+    const user = await prisma.user.create({
+      data: {
+        
+      }
+    })
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: "Server error" })
+  }
+})
+
 // ดึงข้อมูลผู้ใช้
 app.get('/api/getUser/:id', async (req, res) => {
   try {
